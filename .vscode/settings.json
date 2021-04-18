@@ -3,6 +3,7 @@
     "files.associations": {
         "tcp_service.h": "c",
         "state.h": "c",
-        "state_setting.h": "c"
+        "state_setting.h": "c",
+        "tompoc.h": "c"
     }
 }

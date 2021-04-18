@@ -1,12 +1,16 @@
 #include "tcp_service.h"
 
+#include <pthread.h>
+#include <sys/types.h>
+#include <sys/socket.h>
+#include <netinet/in.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
-#include <sys/types.h>
-#include <sys/socket.h>
-#include <netinet/in.h>
+
+#define BACKLOG 10
+#define PORT 345
 
 #define TCP_SND_SIZE 1024
 #define TCP_REC_SIZE 10240
@@ -16,9 +20,6 @@ void str_echo(int sockfd)
 {
     int ret, sock_error = 0;
 
-    ssize_t n;
-    char buf[MAXLINE];
-
 again:
     ret = recv(sockfd, tcprecvbuf, sizeof(tcprecvbuf), 0);
     if (ret > 0)
@@ -27,39 +28,19 @@ again:
     }
     else if (ret == 0)
     {
-        _DEBUG("*** peer closed ***\r\n");
+        printf("*** peer closed ***\r\n");
     }
     else
     {
-        if (!(errno == EINTR || errno == EWOULDBLOCK || errno == EAGAIN))
-        {
-            _DEBUG("[YDPOC]*** error occurs ***\r\n");
-            goto _again_;
-        }
-        else
-        {
-            _DEBUG("[YDPOC]wait for a while\r\n");
-            goto _recv_;
-        }
-
         printf("recv() error\n");
         exit(1);
     }
-
-    while ((n = read(sockfd, buf, MAXLINE)) > 0)
-        Writen(sockfd, buf, n);
-
-    if (n < 0 && errno == EINTR)
-        goto again;
-    else if (n < 0)
-        err_sys("str_echo: read error");
 }
 
-void *tcp_recv_process(void)
+void *tcp_recv_process(void *arg)
 {
     pid_t childpid;
 
-    int listenfd, connectfd;
     int listenfd, connectfd;
     struct sockaddr_in server;
     struct sockaddr_in client;
@@ -105,20 +86,22 @@ void *tcp_recv_process(void)
             exit(1);
         }
 
-        if ((childpid = Fork()) == 0)
+        if ((childpid = fork()) == 0)
         {                        /* child process */
-            Close(listenfd);     /* close listening socket */
+            close(listenfd);     /* close listening socket */
             str_echo(connectfd); /* process the request */
-            printf("Yougot a connection from cient's ip is %s, prot is %d\n", inet_ntoa(client.sin_addr), htons(client.sin_port));
+            //printf("Yougot a connection from cient's ip is %s, prot is %d\n", inet_ntoa(client.sin_addr), htons(client.sin_port));
             // send(connectfd, "Welcometo my server.\n", 22, 0);
             exit(0);
         }
-        Close(connectfd); /* parent closes connected socket */
+        close(connectfd); /* parent closes connected socket */
     }
     close(listenfd);
 }
 
 int tcp_recv_thread_create(void)
 {
+    pthread_t ntid;
+
     return pthread_create(&ntid, NULL, tcp_recv_process, NULL);
 }
